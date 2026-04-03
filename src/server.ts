@@ -10,6 +10,7 @@ import { error, trace } from "./logger";
 import { AndroidRobot, AndroidDeviceManager } from "./android";
 import { ActionableError, Robot } from "./robot";
 import { IosManager, IosRobot } from "./ios";
+import { HarmonyDeviceManager, HarmonyRobot } from "./harmony";
 import { PNG } from "./png";
 import { isScalingAvailable, Image } from "./image-utils";
 import { Mobilecli } from "./mobilecli";
@@ -22,7 +23,7 @@ const ALLOWED_RECORDING_EXTENSIONS = [".mp4"];
 interface MobilecliDevice {
 	id: string;
 	name: string;
-	platform: "android" | "ios";
+	platform: "android" | "ios" | "harmony";
 	type: "real" | "emulator" | "simulator";
 	version: string;
 	state: "online" | "offline";
@@ -157,6 +158,13 @@ export const createMcpServer = (): McpServer => {
 	};
 
 	const getRobotFromDevice = (deviceId: string): Robot => {
+		// Check if it's a HarmonyOS device
+		const harmonyManager = new HarmonyDeviceManager();
+		const harmonyDevices = harmonyManager.getConnectedDevices();
+		const harmonyDevice = harmonyDevices.find(d => d.deviceId === deviceId);
+		if (harmonyDevice) {
+			return new HarmonyRobot(deviceId);
+		}
 
 		// from now on, we must have mobilecli working
 		ensureMobilecliAvailable();
@@ -208,6 +216,7 @@ export const createMcpServer = (): McpServer => {
 
 			const iosManager = new IosManager();
 			const androidManager = new AndroidDeviceManager();
+			const harmonyManager = new HarmonyDeviceManager();
 			const devices: MobilecliDevice[] = [];
 
 			// Get Android devices with details
@@ -218,6 +227,19 @@ export const createMcpServer = (): McpServer => {
 					name: device.name,
 					platform: "android",
 					type: "emulator",
+					version: device.version,
+					state: "online",
+				});
+			}
+
+			// Get HarmonyOS devices with details
+			const harmonyDevices = harmonyManager.getConnectedDevices();
+			for (const device of harmonyDevices) {
+				devices.push({
+					id: device.deviceId,
+					name: device.name,
+					platform: "harmony",
+					type: device.type,
 					version: device.version,
 					state: "online",
 				});
